@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 /** Where the trigger sits in the window, from `measureInWindow`. */
 export type Anchor = { x: number; y: number; width: number; height: number };
 
-/** Matches the web menu's `w-44`. */
+/** Matches the web menu's `w-44`. Widths are on the 4pt grid. */
 const MENU_WIDTH = 176;
 /** Minimum breathing room from the screen edge. */
 const EDGE = 8;
@@ -29,11 +29,17 @@ export function Popover({
   anchor,
   onClose,
   children,
+  width = MENU_WIDTH,
+  contentClassName,
 }: {
   /** Null keeps it closed. */
   anchor: Anchor | null;
   onClose: () => void;
   children: React.ReactNode;
+  /** Wider than a menu where the content needs it, e.g. an email address. */
+  width?: number;
+  /** Replaces the menu padding for panels that lay out their own sections. */
+  contentClassName?: string;
 }) {
   // The measuring body is mounted only while open, so each opening starts
   // without the previous one's height — otherwise the first frame is placed
@@ -41,7 +47,12 @@ export function Popover({
   // that state across closes left an invisible modal eating every touch.
   if (!anchor) return null;
   return (
-    <PopoverPanel anchor={anchor} onClose={onClose}>
+    <PopoverPanel
+      anchor={anchor}
+      onClose={onClose}
+      width={width}
+      contentClassName={contentClassName}
+    >
       {children}
     </PopoverPanel>
   );
@@ -51,18 +62,24 @@ function PopoverPanel({
   anchor,
   onClose,
   children,
+  width,
+  contentClassName,
 }: {
   anchor: Anchor;
   onClose: () => void;
   children: React.ReactNode;
+  width: number;
+  contentClassName?: string;
 }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [height, setHeight] = useState(0);
 
+  // Never wider than the screen allows, however wide the caller asked for.
+  const panelWidth = Math.min(width, screenWidth - EDGE * 2);
   const left = Math.min(
-    Math.max(anchor.x + anchor.width - MENU_WIDTH, EDGE),
-    screenWidth - MENU_WIDTH - EDGE,
+    Math.max(anchor.x + anchor.width - panelWidth, EDGE),
+    screenWidth - panelWidth - EDGE,
   );
 
   const below = anchor.y + anchor.height + OFFSET;
@@ -75,7 +92,10 @@ function PopoverPanel({
   const panel = (
     <View
       onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
-      className="gap-0.5 rounded-lg border border-border bg-popover p-1.5"
+      className={cn(
+        "overflow-hidden rounded-lg border border-border bg-popover",
+        contentClassName ?? "gap-0.5 p-1.5",
+      )}
     >
       {children}
     </View>
@@ -114,8 +134,8 @@ function PopoverPanel({
         pointerEvents="box-none"
         style={
           flip
-            ? { position: "absolute", top: 0, height: anchor.y - OFFSET, left, width: MENU_WIDTH, justifyContent: "flex-end", opacity: height ? 1 : 0 }
-            : { position: "absolute", top: below, left, width: MENU_WIDTH, opacity: height ? 1 : 0 }
+            ? { position: "absolute", top: 0, height: anchor.y - OFFSET, left, width: panelWidth, justifyContent: "flex-end", opacity: height ? 1 : 0 }
+            : { position: "absolute", top: below, left, width: panelWidth, opacity: height ? 1 : 0 }
         }
       >
         {panel}
