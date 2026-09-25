@@ -1,56 +1,88 @@
-# Welcome to your Expo app 👋
+# Cadence — Expo
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A habit tracker for the things you repeat: **habits** you tap through the day,
+**dailies** that follow a schedule, and **to-dos** you finish once.
 
-## Get started
+This is a port of the React + Vite web build at
+[Sothcheat/habit-tracker](https://github.com/Sothcheat/habit-tracker), which
+remains the source of truth for behaviour, copy and design. Both apps share one
+Supabase project and one database — sign in on either and the same tasks are
+there.
 
-1. Install dependencies
+## Running it
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Requires **Node 22+**, **pnpm**, and access to the Supabase project.
 
 ```bash
-npm run reset-project
+pnpm install
+cp .env.example .env.local     # fill in the project URL and anon key
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Open it in **Expo Go** — every native module used here ships with it, so no
+development build is needed.
 
-### Other setup steps
+Only ever the **anon** key. Anything prefixed `EXPO_PUBLIC_` is compiled into
+the app bundle and is readable by anyone who installs it; row level security is
+what keeps data private. A service-role key here would hand every installed copy
+full access to the database.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```bash
+npx expo start      # dev server
+npx expo lint       # lint
+npx tsc --noEmit    # typecheck
+npx jest            # unit tests
+npx expo-doctor     # dependency and config diagnosis
+```
 
-## Learn more
+## What is where
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+src/app/                  routes only — every file is a screen or a _layout
+  (auth)/                 sign in, sign up
+  (app)/                  the tracker: one tab per task type
+src/components/ui/        design-system primitives
+src/components/tracker/   cards, columns, the task editor, tags
+src/lib/tasks/            api.ts holds every query; use-tracker.ts holds state
+src/lib/tasks/selectors.ts   the derived view model, shared by the three tabs
+src/lib/tasks/outbox.ts   writes waiting for the network
+src/lib/tasks/snapshot.ts the read cache that lets the app open offline
+PORTING.md                how the web build translates — read it before coding
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## How it behaves
 
-## Join the community
+**Writes are confirmed, not optimistic.** State changes only once the server
+returns the row. The single exception is an unreachable network: the write goes
+to an outbox, is applied locally, and replays in order on reconnect. A write the
+database *refuses* still fails loudly — the rule bends for the connection, not
+for the database.
 
-Join our community of developers creating universal apps.
+**Reads come from a snapshot first**, then refresh. Opening offline shows what
+you last saw rather than an error.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**"Today" is the user's local date**, resolved from `profiles.timezone` and
+recomputed while the app is open, so a habit tapped at 00:05 is not logged to
+yesterday.
+
+## Building
+
+```bash
+npx eas-cli@latest build --profile preview --platform android
+```
+
+`.env.local` is gitignored and never reaches a cloud build, so
+`EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` have to be set as
+EAS environment variables for any build made on EAS.
+
+## Known gaps
+
+Carried over from the web build rather than introduced here — see the full list
+in [PORTING.md](PORTING.md).
+
+- Google and Apple sign-in are not enabled in Supabase, so neither is offered.
+- Password reset is incomplete.
+- Tags need a connection: creating, renaming and deleting them fail loudly,
+  while tasks and logs queue offline.
+- No live sync — nothing subscribes to Realtime.
+- History is windowed at 30 days for habit strength and 90 for streaks.

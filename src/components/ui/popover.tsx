@@ -1,5 +1,13 @@
-import { useState } from "react";
+import { createContext, use, useRef, useState } from "react";
 import { Modal, Pressable, useWindowDimensions, View } from "react-native";
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/utils";
@@ -13,6 +21,14 @@ const MENU_WIDTH = 176;
 const EDGE = 8;
 /** Gap between the trigger and the panel. All spacing is on the 4pt grid. */
 const OFFSET = 8;
+
+/** The web's `zoom-in-95`: a panel that grows from the control that opened it. */
+const START_SCALE = 0.95;
+const IN_MS = 140;
+const OUT_MS = 100;
+
+type PopoverApi = { requestClose: (then?: () => void) => void };
+const PopoverContext = createContext<PopoverApi | null>(null);
 
 /**
  * A small panel tethered to the control that opened it.
@@ -41,10 +57,9 @@ export function Popover({
   /** Replaces the menu padding for panels that lay out their own sections. */
   contentClassName?: string;
 }) {
-  // The measuring body is mounted only while open, so each opening starts
-  // without the previous one's height — otherwise the first frame is placed
-  // from a stale measurement. Same reasoning as BottomSheet, where holding
-  // that state across closes left an invisible modal eating every touch.
+  // The measuring, animating body is mounted only while open, so each opening
+  // starts without the previous one's state. Holding it across closes is what
+  // left BottomSheet with an invisible modal eating every touch.
   if (!anchor) return null;
   return (
     <PopoverPanel
@@ -74,6 +89,10 @@ function PopoverPanel({
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [height, setHeight] = useState(0);
+  const reduceMotion = useReducedMotion();
+
+  const progress = useSharedValue(0);
+  const entered = useRef(false);
 
   // Never wider than the screen allows, however wide the caller asked for.
   const panelWidth = Math.min(width, screenWidth - EDGE * 2);
@@ -89,23 +108,46 @@ function PopoverPanel({
   // the correction is never seen.
   const flip = height > 0 && height > roomBelow;
 
-  const panel = (
-    <View
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
-      className={cn(
-        "overflow-hidden rounded-lg border border-border bg-popover",
-        contentClassName ?? "gap-0.5 p-1.5",
-      )}
-    >
-      {children}
-    </View>
-  );
+  function handleLayout(measured: number) {
+    setHeight(measured);
+    if (entered.current || measured === 0) return;
+    entered.current = true;
+    progress.value = reduceMotion
+      ? 1
+      : withTiming(1, { duration: IN_MS, easing: Easing.out(Easing.quad) });
+  }
+
+  /** Plays the panel out, then unmounts it and runs whatever follows. */
+  function requestClose(then?: () => void) {
+    const finish = () => {
+      onClose();
+      then?.();
+    };
+    if (reduceMotion || !height) {
+      finish();
+      return;
+    }
+    progress.value = withTiming(
+      0,
+      { duration: OUT_MS, easing: Easing.in(Easing.quad) },
+      (done) => {
+        if (done) runOnJS(finish)();
+      },
+    );
+  }
+
+  const panelStyle = useAnimatedStyle(() => ({
+    opacity: height ? progress.value : 0,
+    transform: [{ scale: START_SCALE + (1 - START_SCALE) * progress.value }],
+  }));
 
   return (
     <Modal
       visible
       transparent
-      animationType="fade"
+      // The modal animates nothing: the panel scales from its trigger, which
+      // a window-level fade cannot express.
+      animationType="none"
       // Android's hardware back must dismiss it, or the menu traps the user.
       onRequestClose={onClose}
       // Deliberately NOT statusBarTranslucent. `measureInWindow` reports the
@@ -117,7 +159,7 @@ function PopoverPanel({
     >
       <Pressable
         className="flex-1"
-        onPress={onClose}
+        onPress={() => requestClose()}
         accessibilityRole="button"
         accessibilityLabel="Close menu"
       />
@@ -126,25 +168,43 @@ function PopoverPanel({
         placed at `anchor.y - height`: a wrapper spanning from the top of the
         screen to just above the trigger, with the panel pushed to its end.
         Subtracting a measured height meant any disagreement between the
-        measurement and the modal's own coordinate space showed up as a gap —
-        which is exactly what opened a thumb-stretching hole above the add
-        button. This way the gap is `OFFSET`, by construction.
+        measurement and the modal's own coordinate space showed up as a gap.
+        This way the gap is `OFFSET`, by construction.
       */}
       <View
         pointerEvents="box-none"
         style={
           flip
-            ? { position: "absolute", top: 0, height: anchor.y - OFFSET, left, width: panelWidth, justifyContent: "flex-end", opacity: height ? 1 : 0 }
-            : { position: "absolute", top: below, left, width: panelWidth, opacity: height ? 1 : 0 }
+            ? { position: "absolute", top: 0, height: anchor.y - OFFSET, left, width: panelWidth, justifyContent: "flex-end" }
+            : { position: "absolute", top: below, left, width: panelWidth }
         }
       >
-        {panel}
+        <Animated.View
+          onLayout={(event) => handleLayout(event.nativeEvent.layout.height)}
+          style={[
+            panelStyle,
+            // Grows from the corner nearest the trigger, so it reads as coming
+            // out of the control rather than appearing over it.
+            { transformOrigin: flip ? "100% 100%" : "100% 0%" },
+          ]}
+          className={cn(
+            "overflow-hidden rounded-lg border border-border bg-popover",
+            contentClassName ?? "gap-0.5 p-1.5",
+          )}
+        >
+          <PopoverContext value={{ requestClose }}>{children}</PopoverContext>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
-/** One row of a popover menu. `destructive` is the only tone a row may carry. */
+/**
+ * One row of a popover menu. `destructive` is the only tone a row may carry.
+ *
+ * Closing is the row's own job: it plays the panel out and only then runs the
+ * action, so a menu is never left standing over whatever the action opens.
+ */
 export function PopoverItem({
   label,
   icon,
@@ -158,9 +218,11 @@ export function PopoverItem({
   disabled?: boolean;
   destructive?: boolean;
 }) {
+  const popover = use(PopoverContext);
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => (popover ? popover.requestClose(onPress) : onPress())}
       disabled={disabled}
       accessibilityRole="menuitem"
       accessibilityLabel={label}

@@ -20,7 +20,7 @@ Read it before writing any slice.
 | S8 | Tags: filter sheet, editor, in-form select | **done** |
 | S9 | Profile sheet | **done** |
 | S10 | Avatar upload (`lib/avatar.ts`, `useTracker.setAvatar`) | **done** |
-| S11 | Polish, accessibility audit, EAS build profiles | next |
+| S11 | Polish, accessibility audit, EAS build profiles | **done** |
 
 ## Rule 1 — Know which tier you are in
 
@@ -454,6 +454,19 @@ app's palette would be worse, not more consistent. Note that an ISO date is a
 calendar day, not an instant: `new Date("2026-09-24")` parses as UTC midnight,
 which west of Greenwich is already the day before, so `date-field.tsx` converts
 through *local* components in both directions.
+
+### Motion
+
+There is no decorative animation, as the design system requires. The three that
+exist are functional: the sheet travels because a panel arriving from the bottom
+edge says where it came from, the popover scales from the corner nearest its
+trigger because it belongs to that control, and the skeleton pulses because a
+still placeholder reads as broken.
+
+All three honour the OS reduce-motion setting through Reanimated's
+`useReducedMotion`, and all three are hand-driven shared values rather than
+layout animations — inside a `Modal` those leave a residual transform that moves
+an element's touch targets away from where it was drawn.
 
 ## Known gaps carried over from the web build
 

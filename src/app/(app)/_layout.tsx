@@ -102,10 +102,9 @@ function TabBar(props: React.ComponentProps<typeof FloatingTabBar>) {
             key={type}
             label={label}
             icon={<Icon as={icon} size={16} className="text-popover-foreground" />}
-            onPress={() => {
-              setAnchor(null);
-              setCreating(type);
-            }}
+            // PopoverItem plays the panel out before running this, so the
+            // picker is never left standing over the editor.
+            onPress={() => setCreating(type)}
           />
         ))}
       </Popover>

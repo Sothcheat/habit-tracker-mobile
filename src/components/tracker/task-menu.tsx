@@ -59,12 +59,6 @@ export function TaskMenu({
     });
   };
 
-  /** Closes first, so the menu is never left standing over a dialog. */
-  const run = (action: () => void) => () => {
-    setAnchor(null);
-    action();
-  };
-
   return (
     <>
       <Pressable
@@ -84,30 +78,30 @@ export function TaskMenu({
         <PopoverItem
           label="Edit"
           icon={<Icon as={Pencil} size={16} className="text-popover-foreground" />}
-          onPress={run(onEdit)}
+          onPress={onEdit}
         />
         <PopoverItem
           label="Share"
           icon={<Icon as={Share2} size={16} className="text-popover-foreground" />}
-          onPress={run(onShare)}
+          onPress={onShare}
         />
         <PopoverItem
           label="To top"
           icon={<Icon as={ArrowUp} size={16} className="text-popover-foreground" />}
-          onPress={run(onMoveTop)}
+          onPress={onMoveTop}
           disabled={isFirst}
         />
         <PopoverItem
           label="To bottom"
           icon={<Icon as={ArrowDown} size={16} className="text-popover-foreground" />}
-          onPress={run(onMoveBottom)}
+          onPress={onMoveBottom}
           disabled={isLast}
         />
         <PopoverSeparator />
         <PopoverItem
           label="Delete"
           icon={<Icon as={Trash2} size={16} className="text-destructive" />}
-          onPress={run(onDelete)}
+          onPress={onDelete}
           destructive
         />
       </Popover>
