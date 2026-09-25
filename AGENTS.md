@@ -1,5 +1,17 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## This app is a port
+
+Cadence is being ported from the React + Vite web build at `../habit-tracker`,
+which remains the source of truth for behaviour, copy and design.
+
+**Read [PORTING.md](PORTING.md) before writing any code** — every time, before the
+first line. It defines which files are copied verbatim, which get one primitive
+swapped, and which are rewritten; the web→native substitution table; the design
+token contract; and the per-slice verification gate. Two of its rules are enforced
+by ESLint, and any intentional difference from the web build belongs in its
+Deviations section rather than in a silent edit.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
