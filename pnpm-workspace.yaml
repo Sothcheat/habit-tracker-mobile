@@ -1,0 +1,31 @@
+# React Native's tooling assumes a flat node_modules.
+#
+# Under pnpm's default isolated layout, installing jest-expo produced two
+# react-native@0.86.3 instances that differed only by peer hash — the app and
+# react-native-css-interop resolved one, react-native-safe-area-context the
+# other. Metro then bundled both, React Native's core initialised twice, and the
+# app died at startup with "[runtime not ready]: TypeError: property is not
+# writable". It built and bundled cleanly the whole time.
+#
+# Expo's monorepo guide states plainly that duplicate React Native versions are
+# not supported, and names this setting as the fix.
+nodeLinker: hoisted
+
+# Allow the one install script Expo's official ESLint config needs.
+# unrs-resolver reaches us transitively from eslint-config-expo via
+# eslint-import-resolver-typescript; its postinstall selects the platform's
+# native resolver binary, and pnpm blocks install scripts by default.
+allowBuilds:
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - '@expo/cli@57.0.27'
+  - '@expo/router-server@57.0.11'
+  - babel-preset-expo@57.0.13
+  - expo-modules-core@57.0.19
+  - expo-modules-jsi@57.1.1
+  - expo@57.0.25
+  - '@expo/ui@57.0.20'
+  - expo-glass-effect@57.0.4
+  - expo-linking@57.0.11
+  - expo-router@57.0.23

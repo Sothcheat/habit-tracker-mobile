@@ -1,9 +1,70 @@
-:root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-    Segoe UI Symbol, Noto Color Emoji;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Cadence colour tokens, converted from the web build's oklch values to sRGB.
+ * Stored as bare "R G B" triplets so tailwind.config.js can wrap them in
+ * rgb(... / <alpha-value>) and keep the alpha modifier working.
+ *
+ * Sanity check on the conversion: light --background is 250 250 252 = #fafafc,
+ * which is exactly the value the web build hand-copied into its PWA manifest.
+ *
+ * Palette rules: violet held under chroma 0.09, de-emphasise by dropping
+ * chroma and never by reaching for grey, every colour defined in both themes.
+ * --muted-foreground has no contrast headroom — do not lighten it.
+ */
+
+@layer base {
+  :root {
+    --background: 250 250 252;
+    --foreground: 45 45 59;
+    --card: 255 255 255;
+    --card-foreground: 45 45 59;
+    --popover: 255 255 255;
+    --popover-foreground: 45 45 59;
+    --primary: 103 98 150;
+    --primary-foreground: 252 252 252;
+    --secondary: 241 240 250;
+    --secondary-foreground: 66 64 83;
+    --muted: 244 244 249;
+    --muted-foreground: 112 112 127;
+    --accent: 238 240 251;
+    --accent-foreground: 51 52 70;
+    --destructive: 190 83 77;
+    --destructive-foreground: 252 252 252;
+    --positive: 116 183 154;
+    --positive-foreground: 15 36 27;
+    --caution: 225 187 129;
+    --caution-foreground: 67 43 20;
+    --border: 230 230 235;
+    --input: 230 230 235;
+    --ring: 103 98 150;
+  }
+
+  .dark:root {
+    --background: 23 23 32;
+    --foreground: 231 231 236;
+    --card: 32 33 43;
+    --card-foreground: 231 231 236;
+    --popover: 32 33 43;
+    --popover-foreground: 231 231 236;
+    --primary: 164 160 211;
+    --primary-foreground: 23 23 32;
+    --secondary: 47 48 61;
+    --secondary-foreground: 214 214 226;
+    --muted: 41 42 53;
+    --muted-foreground: 157 157 171;
+    --accent: 50 51 68;
+    --accent-foreground: 231 231 236;
+    --destructive: 214 113 106;
+    --destructive-foreground: 23 23 32;
+    --positive: 126 188 161;
+    --positive-foreground: 23 23 32;
+    --caution: 223 188 134;
+    --caution-foreground: 23 23 32;
+    --border: 52 53 65;
+    --input: 52 53 65;
+    --ring: 164 160 211;
+  }
 }
