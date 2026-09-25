@@ -1,0 +1,170 @@
+import { useState } from "react";
+import { Modal, Pressable, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Text } from "@/components/ui/text";
+import { cn } from "@/lib/utils";
+
+/** Where the trigger sits in the window, from `measureInWindow`. */
+export type Anchor = { x: number; y: number; width: number; height: number };
+
+/** Matches the web menu's `w-44`. */
+const MENU_WIDTH = 176;
+/** Minimum breathing room from the screen edge. */
+const EDGE = 8;
+/** Gap between the trigger and the panel. All spacing is on the 4pt grid. */
+const OFFSET = 8;
+
+/**
+ * A small panel tethered to the control that opened it.
+ *
+ * A bottom sheet is the better answer for a large panel, but not for a
+ * five-item context menu: the menu belongs to one card, and throwing it to the
+ * bottom of the screen severs it from the thing it acts on.
+ *
+ * Positioning is `align="end"` like the web — the panel's right edge meets the
+ * trigger's — then clamped inside the screen, and flipped above the trigger
+ * when there is not room below.
+ */
+export function Popover({
+  anchor,
+  onClose,
+  children,
+}: {
+  /** Null keeps it closed. */
+  anchor: Anchor | null;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  // The measuring body is mounted only while open, so each opening starts
+  // without the previous one's height — otherwise the first frame is placed
+  // from a stale measurement. Same reasoning as BottomSheet, where holding
+  // that state across closes left an invisible modal eating every touch.
+  if (!anchor) return null;
+  return (
+    <PopoverPanel anchor={anchor} onClose={onClose}>
+      {children}
+    </PopoverPanel>
+  );
+}
+
+function PopoverPanel({
+  anchor,
+  onClose,
+  children,
+}: {
+  anchor: Anchor;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [height, setHeight] = useState(0);
+
+  const left = Math.min(
+    Math.max(anchor.x + anchor.width - MENU_WIDTH, EDGE),
+    screenWidth - MENU_WIDTH - EDGE,
+  );
+
+  const below = anchor.y + anchor.height + OFFSET;
+  const roomBelow = screenHeight - below - insets.bottom - EDGE;
+  // Height is unknown until the panel has laid out once, so it opens downward
+  // and flips if it turns out not to fit. It stays invisible until then, so
+  // the correction is never seen.
+  const flip = height > 0 && height > roomBelow;
+
+  const panel = (
+    <View
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      className="gap-0.5 rounded-lg border border-border bg-popover p-1.5"
+    >
+      {children}
+    </View>
+  );
+
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      // Android's hardware back must dismiss it, or the menu traps the user.
+      onRequestClose={onClose}
+      // Deliberately NOT statusBarTranslucent. `measureInWindow` reports the
+      // trigger in content coordinates, but a translucent modal starts at the
+      // true top of the screen — so every anchor came out short by exactly the
+      // status bar's height, which is the gap that opened above the add
+      // button. Leaving the modal inside the content area puts both in the
+      // same space. Nothing is lost visually: this backdrop is transparent.
+    >
+      <Pressable
+        className="flex-1"
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close menu"
+      />
+      {/*
+        When flipping, the panel is pinned by its *bottom* edge rather than
+        placed at `anchor.y - height`: a wrapper spanning from the top of the
+        screen to just above the trigger, with the panel pushed to its end.
+        Subtracting a measured height meant any disagreement between the
+        measurement and the modal's own coordinate space showed up as a gap —
+        which is exactly what opened a thumb-stretching hole above the add
+        button. This way the gap is `OFFSET`, by construction.
+      */}
+      <View
+        pointerEvents="box-none"
+        style={
+          flip
+            ? { position: "absolute", top: 0, height: anchor.y - OFFSET, left, width: MENU_WIDTH, justifyContent: "flex-end", opacity: height ? 1 : 0 }
+            : { position: "absolute", top: below, left, width: MENU_WIDTH, opacity: height ? 1 : 0 }
+        }
+      >
+        {panel}
+      </View>
+    </Modal>
+  );
+}
+
+/** One row of a popover menu. `destructive` is the only tone a row may carry. */
+export function PopoverItem({
+  label,
+  icon,
+  onPress,
+  disabled = false,
+  destructive = false,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  onPress: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="menuitem"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      className={cn(
+        "h-10 flex-row items-center gap-2.5 rounded-md px-2.5 active:bg-accent",
+        disabled && "opacity-50",
+      )}
+    >
+      {icon}
+      <Text
+        numberOfLines={1}
+        className={cn(
+          "text-sm",
+          destructive ? "text-destructive" : "text-popover-foreground",
+        )}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** A hairline between groups of rows. */
+export function PopoverSeparator() {
+  return <View className="my-1 h-px bg-border" />;
+}
