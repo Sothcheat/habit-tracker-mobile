@@ -18,8 +18,8 @@ Read it before writing any slice.
 | S6 | Task editor: shell and shared fields | **done** |
 | S7 | Per-type schedule fields | **done** |
 | S8 | Tags: filter sheet, editor, in-form select | **done** |
-| S9 | Profile sheet | next |
-| S10 | Avatar upload (`lib/avatar.ts`, `useTracker.setAvatar`) | |
+| S9 | Profile sheet | **done** |
+| S10 | Avatar upload (`lib/avatar.ts`, `useTracker.setAvatar`) | next |
 | S11 | Polish, accessibility audit, EAS build profiles | |
 
 ## Rule 1 — Know which tier you are in

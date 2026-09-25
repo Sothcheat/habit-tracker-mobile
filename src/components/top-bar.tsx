@@ -1,6 +1,7 @@
 import { View } from "react-native";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { ProfileSheet } from "@/components/profile-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Wordmark } from "@/components/wordmark";
 import { useTrackerContext } from "@/lib/tasks/tracker-context";
@@ -22,6 +23,7 @@ export function TopBar() {
       <OfflineIndicator pending={pendingWrites} />
       <ErrorBoundary section="The account menu" variant="inline">
         <ThemeToggle />
+        <ProfileSheet />
       </ErrorBoundary>
     </View>
   );
