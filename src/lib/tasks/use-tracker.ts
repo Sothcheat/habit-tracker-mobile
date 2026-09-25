@@ -1,6 +1,7 @@
 import NetInfo from "@react-native-community/netinfo";
 import { useCallback, useEffect, useState } from "react";
 import { useToday } from "@/hooks/use-today";
+import { prepareAvatar } from "@/lib/avatar";
 import { newId } from "@/lib/uuid";
 import type { Tag, Task, TaskType } from "@/lib/tasks/api";
 import * as api from "@/lib/tasks/api";
@@ -584,6 +585,46 @@ export function useTracker(userId: string) {
    * actually in the bucket, so a failed upload leaves avatar_url pointing at
    * an image that still exists rather than at a 404.
    */
+  /**
+   * Uploads first, then points the row at it, then removes the old object.
+   *
+   * That order is what keeps the profile row always pointing at an image that
+   * exists. If the row update fails the new object is the orphan and is
+   * deleted; the old one is only removed once the row no longer refers to it.
+   */
+  async function setAvatar(uri: string): Promise<Result> {
+    let prepared: Awaited<ReturnType<typeof prepareAvatar>>;
+    try {
+      prepared = await prepareAvatar(uri);
+    } catch (error) {
+      // prepareAvatar throws messages written for the user.
+      return { error: (error as Error).message };
+    }
+
+    const uploaded = await api.uploadAvatar(
+      userId,
+      prepared.bytes,
+      prepared.extension,
+      prepared.contentType,
+    );
+    if (uploaded.error) return fail(uploaded.error);
+
+    const { data: profile, error } = await api.updateProfileAvatar(
+      userId,
+      uploaded.path,
+    );
+    if (error) {
+      // The row still points at the old image, so the orphan is the new one.
+      await api.deleteAvatarObject(uploaded.path);
+      return fail(error);
+    }
+
+    const previous = data?.avatarPath ?? null;
+    update((d) => ({ ...d, avatarPath: profile.avatar_url }));
+    if (previous) await api.deleteAvatarObject(previous);
+    return ok;
+  }
+
   async function removeAvatar(): Promise<Result> {
     const previous = data?.avatarPath ?? null;
     if (!previous) return ok;
@@ -603,6 +644,7 @@ export function useTracker(userId: string) {
     pendingIds,
     pendingWrites,
     reload,
+    setAvatar,
     removeAvatar,
     addTask,
     editTask,

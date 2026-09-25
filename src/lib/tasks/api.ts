@@ -92,11 +92,19 @@ export function avatarPublicUrl(path: string) {
  * serving the previous image after a change — a stale avatar that no cache
  * header we control can reliably fix.
  */
-export function uploadAvatar(userId: string, blob: Blob, extension: string) {
+export function uploadAvatar(
+  userId: string,
+  // An ArrayBuffer rather than the web's Blob: supabase-js storage uploads
+  // from a Blob are unreliable in React Native, and the content type has to be
+  // passed explicitly because bytes do not carry one.
+  bytes: ArrayBuffer,
+  extension: string,
+  contentType: string,
+) {
   const path = `${userId}/${newId()}.${extension}`;
   return supabase.storage
     .from(AVATAR_BUCKET)
-    .upload(path, blob, { contentType: blob.type, upsert: false })
+    .upload(path, bytes, { contentType, upsert: false })
     .then((result) => ({ ...result, path }));
 }
 

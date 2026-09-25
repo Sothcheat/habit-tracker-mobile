@@ -1,10 +1,12 @@
-import { LogOut } from "lucide-react-native";
+import { Check, ImageUp, LogOut, Trash2, X } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Pressable, type View as RNView, View } from "react-native";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { type Anchor, Popover } from "@/components/ui/popover";
 import { Text } from "@/components/ui/text";
+import { pickAvatar, validateAvatar } from "@/lib/avatar";
 import { useAuth } from "@/lib/auth";
 import { identity } from "@/lib/identity";
 import { supabase } from "@/lib/supabase";
@@ -27,10 +29,19 @@ const PANEL_WIDTH = 280;
  */
 export function ProfileMenu() {
   const { user } = useAuth();
-  const { data } = useTrackerContext();
+  const tracker = useTrackerContext();
+  const { data } = tracker;
   const trigger = useRef<RNView>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [busy, setBusy] = useState<"upload" | "remove" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /**
+   * A pick waiting to be saved. Choosing a photo is not uploading it: the
+   * large avatar previews the choice and Save confirms it, so a mis-tap costs
+   * nothing and Save has something visible to be about.
+   */
+  const [chosen, setChosen] = useState<string | null>(null);
 
   if (!user) return null;
 
@@ -38,6 +49,8 @@ export function ProfileMenu() {
   // a signed URL and the image needs no auth header.
   const photoUrl = data?.avatarPath ? avatarPublicUrl(data.avatarPath) : null;
   const { name, email, photo, initial } = identity(user, photoUrl);
+  const shown = chosen ?? photo;
+  const working = busy !== null;
 
   // Measured at open rather than on layout: the bar can move between the two.
   const open = () => {
@@ -45,6 +58,43 @@ export function ProfileMenu() {
       setAnchor({ x, y, width, height });
     });
   };
+
+  async function handleChoose() {
+    setError(null);
+    try {
+      const picked = await pickAvatar();
+      if (!picked) return;
+      const reason = validateAvatar(picked);
+      if (reason) {
+        // A rejection leaves any existing preview alone.
+        setError(reason);
+        return;
+      }
+      setChosen(picked.uri);
+    } catch (problem) {
+      setError((problem as Error).message);
+    }
+  }
+
+  async function handleSave() {
+    if (!chosen) return;
+    setBusy("upload");
+    setError(null);
+    const result = await tracker.setAvatar(chosen);
+    setBusy(null);
+    // A failed save keeps the preview, so Save can be retried without picking
+    // the photo again.
+    if (result.error) setError(result.error);
+    else setChosen(null);
+  }
+
+  async function handleRemove() {
+    setBusy("remove");
+    setError(null);
+    const result = await tracker.removeAvatar();
+    setBusy(null);
+    if (result.error) setError(result.error);
+  }
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -65,7 +115,7 @@ export function ProfileMenu() {
         hitSlop={8}
         className="rounded-full active:opacity-80"
       >
-        <Avatar photo={photo} initial={initial} size={32} />
+        <Avatar photo={shown} initial={initial} size={32} />
       </Pressable>
 
       <Popover
@@ -75,7 +125,7 @@ export function ProfileMenu() {
         contentClassName=""
       >
         <View className="flex-row items-center gap-3 p-4">
-          <Avatar photo={photo} initial={initial} size={48} />
+          <Avatar photo={shown} initial={initial} size={48} />
           <View className="flex-1">
             <Text
               accessibilityRole="header"
@@ -88,6 +138,68 @@ export function ProfileMenu() {
               {email}
             </Text>
           </View>
+        </View>
+
+        <View className="gap-2 border-border border-t px-4 py-3">
+          <View className="flex-row flex-wrap gap-2">
+            {chosen ? (
+              <>
+                <Button size="sm" disabled={working} onPress={handleSave}>
+                  <Icon as={Check} size={14} className="text-primary-foreground" />
+                  <Text className="font-medium text-primary-foreground text-sm">
+                    {busy === "upload" ? "Saving…" : "Save photo"}
+                  </Text>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={working}
+                  onPress={() => {
+                    setChosen(null);
+                    setError(null);
+                  }}
+                >
+                  <Icon as={X} size={14} className="text-muted-foreground" />
+                  <Text className="text-muted-foreground text-sm">Cancel</Text>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={working}
+                  onPress={handleChoose}
+                >
+                  <Icon as={ImageUp} size={14} className="text-foreground" />
+                  <Text className="font-medium text-foreground text-sm">
+                    {photo ? "Change photo" : "Add photo"}
+                  </Text>
+                </Button>
+                {photoUrl ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={working}
+                    onPress={handleRemove}
+                  >
+                    <Icon as={Trash2} size={14} className="text-muted-foreground" />
+                    <Text className="text-muted-foreground text-sm">
+                      {busy === "remove" ? "Removing…" : "Remove"}
+                    </Text>
+                  </Button>
+                ) : null}
+              </>
+            )}
+          </View>
+          {error ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              className="text-destructive text-xs leading-relaxed"
+            >
+              {error}
+            </Text>
+          ) : null}
         </View>
 
         <View className="border-border border-t p-2">

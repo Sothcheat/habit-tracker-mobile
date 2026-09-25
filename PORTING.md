@@ -19,8 +19,8 @@ Read it before writing any slice.
 | S7 | Per-type schedule fields | **done** |
 | S8 | Tags: filter sheet, editor, in-form select | **done** |
 | S9 | Profile sheet | **done** |
-| S10 | Avatar upload (`lib/avatar.ts`, `useTracker.setAvatar`) | next |
-| S11 | Polish, accessibility audit, EAS build profiles | |
+| S10 | Avatar upload (`lib/avatar.ts`, `useTracker.setAvatar`) | **done** |
+| S11 | Polish, accessibility audit, EAS build profiles | next |
 
 ## Rule 1 — Know which tier you are in
 
@@ -289,8 +289,9 @@ Every intentional difference, so none of them is a surprise later.
 12. **`lib/tasks/selectors.ts` is new**: the derived view model lifted out of
    the web's 565-line `TrackerPage`, parameterised per column (Rule 11).
    `sortKey` moved here from `useTracker`.
-13. **`useTracker.setAvatar` is not ported yet** — it needs `lib/avatar.ts`,
-   which is the S10 slice. `removeAvatar` is present and complete.
+13. **`api.uploadAvatar` takes an `ArrayBuffer`, not a `Blob`,** and is given
+   the content type explicitly. supabase-js storage uploads from a `Blob` are
+   unreliable in React Native, and bytes carry no type of their own.
 14. **`Checkbox` composes state classes *after* the caller's `className`.**
    The web's `data-checked:` variants beat plain classes on specificity at any
    source order; NativeWind has no such variant, so order is the only lever. A
@@ -394,6 +395,19 @@ Every intentional difference, so none of them is a surprise later.
    exactly one — and launch the app.
 
 ### Slice notes
+
+**S10** is the one genuine rewrite in the port rather than a translation.
+`lib/avatar.ts` was built on `createImageBitmap`, a `<canvas>` and
+`canvas.toBlob`, plus a probe for whether the browser could encode WebP at all
+— `toBlob` answers an unsupported format with PNG rather than an error. None of
+that exists here and none of it is needed: the system picker crops (which
+replaces the web's centre-crop guess with the user's own choice), and
+expo-image-manipulator encodes WebP on both platforms without asking.
+
+What survived untouched is the *ordering*, which is the part that matters:
+upload, then point the row at it, then delete the old object. A failed row
+update makes the new object the orphan; the old one is only removed once
+nothing refers to it, so the profile row never points at an image that is gone.
 
 **S8** extracted `buildTagEdits` into `lib/tasks/tag-edits.ts`. The diff it
 produces is subtle — a rename onto a name another row is giving up is only legal
